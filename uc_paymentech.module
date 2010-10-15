@@ -1,0 +1,137 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Process payments using Chase Paymentech Orbital gateway
+ * Right now this module only supports auth/capture
+ * May add auth before capture and post auth capture
+ * as well as recurring billing if there is demand.
+ */
+
+/*******************************************************************************
+ * Hook Functions (Ubercart)
+ ******************************************************************************/
+
+function uc_paymentech_payment_gateway() {
+  $gateways[] = array(
+    'id' => 'paymentech',
+    'title' => t('PaymentTech'),
+    'description' => t('Process credit card payments using the Chase Paymentech Orbital gateway.'),
+    'settings' => 'uc_paymentech_settings_form',
+    'credit' => 'uc_paymentech_charge',
+  );
+
+  return $gateways;
+}
+/**
+ * Callback for payment gateway settings.
+ */
+function uc_paymentech_settings_form() {
+  $form['paymentech_settings'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Chase Paymentech Settings'),
+  );
+  $form['paymentech_settings']['paymentech_merchant_id'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Merchant ID'),
+    '#default_value' => variable_get('paymentech_merchant_id', ''),
+    '#description' => t('Merchant ID for Paymentech Gateway.'),
+  );
+  $form['paymentech_settings']['paymentech_terminal_id'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Terminal ID'),
+    '#default_value' => variable_get('paymentech_terminal_id', ''),
+    '#description' => t('Terminal ID for Paymentech Gateway.'),
+  );
+  $form['paymentech_settings']['paymentech_transaction_mode'] = array(
+    '#type' => 'select',
+    '#title' => t('Transaction Mode'),
+    '#description' => t('Are you testing your transaction processing or are you in production?.'),
+    '#options' => array(
+      'production' => t('Production'),
+      'test' => t('Test'),
+    ),
+    '#default_value' => variable_get('paymentech_transaction_mode', 'test'),
+  );
+  return $form;
+}
+
+
+/**
+ * Callback to process transaction
+ */
+
+function uc_paymenttech_charge($order_id, $amount, $data){
+        require_once 'PaymentechClass.php';
+        
+        global $user, $response;
+        $order = uc_order_load($order_id);
+  
+        $ptprocessor = new PaymentechProcessor();
+        
+        switch(strtolower($params('credit_card_type')){
+        case 'visa':
+            $cc_type = CCTYPE_VISA;
+        case 'mastercard':
+            $cctype = CCTYPE_MASTERCARD;
+        case 'discover':
+            $cctype = CCTYPE_DISCOVER;
+        case 'american express':
+            $cctype = CCTYPE_AMEX;
+        }
+        
+        $ptprocessor->address1 = $order->billing_street1;
+        $ptprocessor->amount = uc_price($amount, $context, $options);
+        $ptprocessor->bin = '000002';
+        $ptprocessor->card_owner = $order->payment_details['cc_owner'];
+        $ptprocessor->card_type = $cctype;
+        $ptprocessor->cc_expiry_mon = $order->payment_details['cc_exp_month'];
+        $ptprocessor->cc_expiry_yr = $order->payment_details['cc_exp_year'];
+        $ptprocessor->cc_num = $order->payment_details['cc_number'];
+        $ptprocessor->city = $order->billing_city;
+        $ptprocessor->state = uc_get_zone_code($order->billing_zone);
+        $ptprocessor->postal_code = $order->billing_postal_code;
+        $ptprocessor->phone = $order->billing_phone;
+        $ptprocessor->cvv = $order->payment_details['cc_cvv'];
+        $ptprocessor->merchant_id = $this->_profile['merchant_id'];
+        $ptprocessor->terminal_id = $this->_profile['terminal_id'];
+        $ptprocessor->industry_type = 'EC';
+        $ptprocessor->message_type = 'AC';
+        $ptprocessor->ordernum = $order->order_id;
+        
+        $respCode = $ptprocessor->processACPayment();
+        // If we didn't get an approval response code...
+        if ($response != '0') {
+            // Fail the charge with the reason text in the decline message.
+            $result = array(
+                'success' => FALSE,
+                'message' => t('Credit card payment declined: @message', array('@message' => $ptprocessor->transactionMsg)),
+                'uid' => $user->uid,
+            );
+        }
+        else {
+                // Build a message for display and comments in the payments table.
+                $message = t('Type: auth-capture<br />ID: @id', array('@id' => $ptprocessor->tx_ref_num));
+                $result = array(
+                    'success' => TRUE,
+                    'comment' => $message,
+                    'message' => $message,
+                    'data' => array('module' => 'uc_paymentech', 'txn_type' => 'auth-capture', 'txn_id' => $ptprocessor->tx_ref_num),
+                    'uid' => $user->uid,
+                );
+
+        // Build an admin order comment.
+        $context = array(
+        'revision' => 'formatted-original',
+        'location' => 'paymentech-charge-comment',
+        );
+        $comment = t('<b>@type</b><br /><b>@status:</b> @message<br />Amount: @amount',
+        array('@type' => 'auth-capture', '@status' => $result['success'] ? t('ACCEPTED') : t('REJECTED'), '@message' => $ptprocessor->transactionMsg, '@amount' => uc_price($amount);
+
+
+        // Save the comment to the order.
+        uc_order_comment_save($order->order_id, $user->uid, $comment, 'admin');
+
+        return $result;
+}

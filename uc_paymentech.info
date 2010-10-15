@@ -1,0 +1,5 @@
+; $Id$
+name = Chase Paymentech
+description = Uses Paymentech Orbital Gateway to process payments
+dependencies = uc_payment uc_credit
+package = Ubercart - payment
