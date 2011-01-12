@@ -62,7 +62,7 @@ function uc_paymentech_settings_form() {
  * Callback to process transaction
  */
 
-function uc_paymenttech_charge($order_id, $amount, $data){
+function uc_paymentech_charge($order_id, $amount, $data){
         require_once 'PaymentechClass.php';
         
         global $user, $response;
