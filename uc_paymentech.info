@@ -1,5 +1,7 @@
 ; $Id$
 name = Chase Paymentech
-description = Uses Paymentech Orbital Gateway to process payments
-dependencies = uc_payment uc_credit
+description = Process payments using Chase Paymentech Orbital Gateway
+core = 6.x
+dependencies[] = uc_payment 
+dependencies[] = uc_credit
 package = Ubercart - payment
