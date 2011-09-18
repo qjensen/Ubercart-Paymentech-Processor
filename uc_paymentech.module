@@ -70,7 +70,7 @@ function uc_paymentech_charge($order_id, $amount, $data){
   
         $ptprocessor = new PaymentechProcessor();
         
-        switch(strtolower($params('credit_card_type')){
+        switch(strtolower($params('credit_card_type'))){
         case 'visa':
             $cc_type = CCTYPE_VISA;
         case 'mastercard':
